@@ -1,125 +1,187 @@
 # Task Tracker
 
-Веб-приложение для управления задачами с поддержкой Rice Scoring и Матрицы Эйзенхауэра.
-
-## Возможности
-
-- 📝 Создание и управление задачами
-- 📊 Rice Scoring для приоритизации задач
-- 🎯 Матрица Эйзенхауэра для планирования
-- 📁 Группировка задач по проектам
-- 🔗 Ссылки на внешние трекеры (YouTrack, Jira и др.)
-- 👥 Назначение исполнителей
-
-## Установка и запуск
-
-### Бэкенд (FastAPI)
-
-1. Установите зависимости Python:
-```bash
-cd C:\Users\suici\PycharmProjects\tasktracker
-python -m pip install -r requirements.txt
-```
-
-2. Запустите сервер:
-```bash
-python main.py
-```
-
-Сервер запустится на `http://0.0.0.0:8000` (доступен из локальной сети)
-
-### Фронтенд (React)
-
-1. Установите зависимости Node.js:
-```bash
-cd frontend
-npm install
-```
-
-2. Запустите в режиме разработки:
-```bash
-npm start
-```
-
-Приложение откроется на `http://localhost:3000`
-
-3. Для production сборки:
-```bash
-npm run build
-```
-
-После сборки файлы будут в папке `frontend/build` и будут автоматически доступны через FastAPI.
-
-## Доступ из локальной сети
-
-1. Запустите бэкенд командой `python main.py`
-2. Узнайте свой локальный IP адрес:
-   - Windows: `ipconfig` (ищите IPv4 адрес, например 192.168.1.100)
-   - Linux/Mac: `ifconfig` или `ip addr`
-3. Другие устройства в сети могут подключиться по адресу:
-   - Бэкенд API: `http://ваш-ip:8000`
-   - Фронтенд (после npm build): `http://ваш-ip:8000`
-
-## API Документация
-
-После запуска бэкенда документация API доступна по адресу:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+Веб-приложение для управления задачами с аналитикой и приоритизацией.
 
 ## Технологии
 
 **Backend:**
+- Python 3.14
 - FastAPI
 - SQLAlchemy
 - SQLite
-- Pydantic
+- openpyxl (работа с Excel)
 
 **Frontend:**
 - React 18
 - React Router
 - Axios
-- Lucide Icons
+- Tailwind CSS
 
 ## Структура проекта
 
 ```
 tasktracker/
-├── backend/           # Бэкенд FastAPI
-│   ├── crud.py       # CRUD операции
-│   ├── database.py   # Настройки БД
-│   ├── models.py     # SQLAlchemy модели
-│   ├── routers.py    # API endpoints
-│   └── schemas.py    # Pydantic схемы
-├── frontend/         # Фронтенд React
-│   ├── public/
-│   └── src/
-│       ├── components/  # React компоненты
-│       ├── pages/       # Страницы
-│       └── services/    # API клиент
-├── main.py           # Главный файл запуска
-└── requirements.txt  # Python зависимости
+├── backend/              # Backend модули
+│   ├── crud.py          # CRUD операции с БД
+│   ├── database.py      # Конфигурация БД
+│   ├── excel_utils.py   # Работа с Excel файлами
+│   ├── models.py        # SQLAlchemy модели
+│   ├── routers.py       # API endpoints
+│   └── schemas.py       # Pydantic схемы
+├── frontend/            # React приложение
+│   ├── src/
+│   │   ├── components/  # React компоненты
+│   │   ├── pages/       # Страницы приложения
+│   │   └── services/    # API клиент
+│   └── package.json
+├── main.py              # Точка входа FastAPI
+├── init_test_data.py    # Скрипт создания тестовых данных
+├── tasktracker.db       # База данных SQLite
+├── requirements.txt     # Python зависимости
+├── START_ALL.bat        # Запуск обоих серверов
+├── start_backend.bat    # Запуск только backend
+└── start_frontend.bat   # Запуск только frontend
 ```
 
-## Rice Scoring
+## Быстрый старт
 
-**Формула:** Priority Score = Value × Reach × Budget Impact × Confidence
+### 1. Установка зависимостей
 
-- **Value (1-5)** — влияние фичи
-- **Reach (1-5)** — охват пользователей
-- **Budget Impact (1, 1.2, 1.5, 2)** — влияние на бюджет
-- **Confidence (10-100%)** — уверенность в оценке
+**Backend:**
+```bash
+pip install -r requirements.txt
+```
 
-**Интерпретация:**
-- 40+ — Берём в работу
-- 25-39 — Кандидат в работу
-- 10-24 — Требуется уточнение
-- 0-9 — Не берём в работу
+**Frontend:**
+```bash
+cd frontend
+npm install
+```
 
-## Матрица Эйзенхауэра
+### 2. Запуск приложения
 
-Задачи распределяются по 4 квадрантам:
-1. **Важно и срочно** — делать немедленно
-2. **Важно, не срочно** — планировать
-3. **Не важно, срочно** — делегировать
-4. **Не важно, не срочно** — удалить или отложить
+**Простой способ:**
+
+Дважды кликните на `START_ALL.bat` - откроются 2 окна с серверами.
+
+Подробные инструкции: [ЗАПУСК.md](ЗАПУСК.md)
+
+**Ручной запуск:**
+```bash
+# Backend
+py -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+
+# Frontend (в другом терминале)
+cd frontend
+npm start
+```
+
+### 3. Создание тестовых данных
+
+```bash
+py init_test_data.py
+```
+
+Создаст:
+- 10 задач в разделе "Все задачи"
+- 5 черновиков в разделе "Priority Score"
+- 3 проекта: Copilot, DA, Прочие
+
+## Функциональность
+
+### Основные возможности
+
+- ✅ Создание и управление задачами
+- ✅ Создание проектов с иконками
+- ✅ Фильтрация по столбцам (Название, Исполнитель, Приоритет, Проект, Priority Score)
+- ✅ Приоритизация задач (Low, Medium, High, Highest)
+- ✅ Массовая загрузка задач из Excel
+- ✅ Скачивание шаблона Excel для импорта
+- ✅ Завершение задач и архивирование
+
+### Аналитика
+
+**Priority Score:**
+- Расчёт приоритета задачи по формуле: `Value × Reach × Budget Impact × Confidence`
+- Метрики:
+  - Value (влияние) — 1-5
+  - Reach (охват) — 1-5
+  - Budget Impact — 1.0, 1.2, 1.5, 2.0
+  - Confidence (уверенность) — 10%, 20%, ..., 100%
+- Автоматическая категоризация:
+  - **40+** → Берём в работу
+  - **25-39** → Кандидат в работу
+  - **10-24** → Требуется уточнение
+  - **0-9** → Не берём в работу
+
+**Матрица Эйзенхауэра:**
+- Классификация задач по важности и срочности
+- 4 квадранта для приоритизации
+
+## API
+
+Backend API: http://localhost:8080
+
+**Документация:** http://localhost:8080/docs
+
+### Основные endpoints
+
+```
+GET    /api/tasks/               # Список задач
+POST   /api/tasks/               # Создать задачу
+PUT    /api/tasks/{id}           # Обновить задачу
+DELETE /api/tasks/{id}           # Удалить задачу
+
+GET    /api/projects/            # Список проектов
+POST   /api/projects/            # Создать проект
+PUT    /api/projects/{id}        # Обновить проект
+DELETE /api/projects/{id}        # Удалить проект
+
+GET    /api/analytics/rice       # Priority Score аналитика
+GET    /api/analytics/eisenhower # Матрица Эйзенхауэра
+
+POST   /api/tasks/upload-excel   # Загрузка задач из Excel
+GET    /api/tasks/download-template # Скачать шаблон Excel
+```
+
+## Доступ из локальной сети
+
+Backend запущен с `--host 0.0.0.0`, что позволяет подключаться из локальной сети:
+
+1. Узнайте свой IP: `ipconfig`
+2. Найдите "IPv4 Address" (например, 192.168.1.100)
+3. Другие пользователи могут открыть:
+   - Frontend: `http://192.168.1.100:3000`
+   - Backend API: `http://192.168.1.100:8080`
+
+## Архитектура
+
+### Backend
+
+**Модули:**
+- `models.py` - SQLAlchemy модели (Task, Project)
+- `schemas.py` - Pydantic схемы для валидации
+- `crud.py` - CRUD операции с базой данных
+- `routers.py` - FastAPI endpoints
+- `database.py` - Конфигурация SQLite
+- `excel_utils.py` - Импорт/экспорт Excel
+
+**База данных:** SQLite (`tasktracker.db`)
+
+Таблицы создаются автоматически при запуске через SQLAlchemy.
+
+### Frontend
+
+**Структура:**
+- `pages/` - Страницы приложения (AllTasks, RiceScoring, EisenhowerMatrix, Completed, ProjectView)
+- `components/` - Переиспользуемые компоненты (Sidebar, TaskModal, ProjectModal)
+- `services/` - API клиент (axios)
+
+**Стилизация:** Tailwind CSS
+
+**Роутинг:** React Router v6
+
+## Лицензия
+
+MIT
 

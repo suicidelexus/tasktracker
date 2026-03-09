@@ -1,35 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, FolderPlus } from 'lucide-react';
-import { tasksAPI, taskGroupsAPI } from '../services/api';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Pencil, Trash2, Upload, Download, ChevronDown, ExternalLink, X as XIcon } from 'lucide-react';
+import { tasksAPI, projectsAPI } from '../services/api';
 import TaskModal from '../components/TaskModal';
+import axios from 'axios';
 
-const AllTasks = () => {
+const AllTasks = ({ projectId = null, showCompleted = false }) => {
   const [tasks, setTasks] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState('');
-  const [newGroupName, setNewGroupName] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const [filters, setFilters] = useState({
+    search: '',
+    assignee: '',
+    priority: [],
+    project_id: '',
+    rice_category: ''
+  });
+
+  const [uniqueAssignees, setUniqueAssignees] = useState([]);
 
   useEffect(() => {
     loadData();
-  }, [selectedGroup]);
+  }, [projectId, showCompleted, filters]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tasksResponse, groupsResponse] = await Promise.all([
-        tasksAPI.getAll(selectedGroup ? { group_id: selectedGroup } : {}),
-        taskGroupsAPI.getAll()
+      const params = {
+        is_completed: showCompleted,
+        is_draft: false
+      };
+      if (projectId) params.project_id = projectId;
+      if (filters.search) params.search = filters.search;
+      if (filters.assignee) params.assignee = filters.assignee;
+      if (filters.priority.length > 0) params.priority = filters.priority.join(',');
+      if (filters.project_id && !projectId) params.project_id = filters.project_id;
+
+      const [tasksResponse, projectsResponse] = await Promise.all([
+        tasksAPI.getAll(params),
+        projectsAPI.getAll()
       ]);
-      setTasks(tasksResponse.data);
-      setGroups(groupsResponse.data);
+
+      let filteredTasks = tasksResponse.data;
+      if (filters.rice_category) {
+        filteredTasks = filteredTasks.filter(task => task.rice_category === filters.rice_category);
+      }
+
+      setTasks(filteredTasks);
+      setProjects(projectsResponse.data);
+      const assignees = [...new Set(filteredTasks.map(t => t.assignee).filter(Boolean))];
+      setUniqueAssignees(assignees);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleCompleted = async (task) => {
+    try {
+      await tasksAPI.update(task.id, { is_completed: !task.is_completed });
+      loadData();
+    } catch (error) {
+      console.error('Ошибка обновления статуса задачи:', error);
     }
   };
 
@@ -49,35 +98,113 @@ const AllTasks = () => {
     setShowTaskModal(true);
   };
 
-  const handleCreateGroup = async (e) => {
-    e.preventDefault();
-    if (!newGroupName.trim()) return;
-
+  const handleDownloadTemplate = async () => {
     try {
-      await taskGroupsAPI.create({ name: newGroupName, description: '' });
-      setNewGroupName('');
-      setShowGroupModal(false);
-      loadData();
+      const response = await axios.get('http://localhost:8080/api/tasks/excel/template', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'tasks_template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowDropdown(false);
     } catch (error) {
-      console.error('Ошибка создания группы:', error);
-      alert('Ошибка при создании группы');
+      console.error('Ошибка скачивания шаблона:', error);
+      alert('Ошибка при скачивании шаблона');
     }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setUploading(true);
+      const response = await axios.post('http://localhost:8080/api/tasks/excel/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert(`Успешно импортировано ${response.data.count} задач(и)`);
+      loadData();
+      setShowDropdown(false);
+    } catch (error) {
+      console.error('Ошибка импорта:', error);
+      const errorMessage = error.response?.data?.detail || 'Ошибка при импорте файла';
+      alert(errorMessage);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const getPriorityBadge = (priority) => {
+    if (!priority) return null;
+    const priorityColors = {
+      'Low': { bg: '#e0f2fe', text: '#0369a1', icon: '🟢' },
+      'Medium': { bg: '#fef3c7', text: '#d97706', icon: '🟡' },
+      'High': { bg: '#fed7aa', text: '#ea580c', icon: '🟠' },
+      'Highest': { bg: '#fecaca', text: '#dc2626', icon: '🔴' }
+    };
+    const style = priorityColors[priority];
+    if (!style) return null;
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        fontSize: '0.85rem',
+        fontWeight: '500',
+        backgroundColor: style.bg,
+        color: style.text
+      }}>
+        {style.icon} {priority}
+      </span>
+    );
   };
 
   const getRiceBadge = (task) => {
     if (!task.rice_score) return null;
-
     let className = 'badge ';
     if (task.rice_category === 'В работу') className += 'badge-success';
     else if (task.rice_category === 'Кандидат') className += 'badge-info';
     else if (task.rice_category === 'Требуется уточнение') className += 'badge-warning';
     else className += 'badge-danger';
-
     return (
       <span className={className}>
         {task.rice_category} ({task.rice_score.toFixed(1)})
       </span>
     );
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handlePriorityToggle = (priority) => {
+    setFilters(prev => ({
+      ...prev,
+      priority: prev.priority.includes(priority)
+        ? prev.priority.filter(p => p !== priority)
+        : [...prev.priority, priority]
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      assignee: '',
+      priority: [],
+      project_id: '',
+      rice_category: ''
+    });
   };
 
   if (loading) {
@@ -91,86 +218,305 @@ const AllTasks = () => {
   return (
     <>
       <div className="header">
-        <h2>Все задачи</h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary" onClick={() => setShowGroupModal(true)}>
-            <FolderPlus size={18} />
-            Создать группу
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setEditingTask(null);
-              setShowTaskModal(true);
-            }}
-          >
-            <Plus size={18} />
-            Новая задача
-          </button>
-        </div>
+        <h2>{showCompleted ? 'Завершенные задачи' : projectId ? 'Проект' : 'Все задачи'}</h2>
+        {!showCompleted && (
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ position: 'relative' }} ref={dropdownRef}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowDropdown(!showDropdown)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Plus size={18} />
+                Новая задача
+                <ChevronDown size={16} />
+              </button>
+              {showDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  border: '1px solid #e2e8f0',
+                  minWidth: '220px',
+                  zIndex: 1000
+                }}>
+                  <button
+                    onClick={() => {
+                      setEditingTask(null);
+                      setShowTaskModal(true);
+                      setShowDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '14px',
+                      color: '#334155',
+                      borderBottom: '1px solid #e2e8f0'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Plus size={16} />
+                    Создать вручную
+                  </button>
+                  <button
+                    onClick={handleDownloadTemplate}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '14px',
+                      color: '#334155',
+                      borderBottom: '1px solid #e2e8f0'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Download size={16} />
+                    Скачать шаблон Excel
+                  </button>
+                  <label
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      cursor: uploading ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '14px',
+                      color: uploading ? '#94a3b8' : '#334155',
+                      borderRadius: '0 0 8px 8px'
+                    }}
+                    onMouseEnter={(e) => !uploading && (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Upload size={16} />
+                    {uploading ? 'Загрузка...' : 'Загрузить из Excel'}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="content-area">
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ marginRight: '10px', fontWeight: '500' }}>Фильтр по группе:</label>
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-          >
-            <option value="">Все группы</option>
-            {groups.map(group => (
-              <option key={group.id} value={group.id}>{group.name}</option>
-            ))}
-          </select>
-        </div>
 
         {tasks.length === 0 ? (
           <div className="empty-state">
             <h3>Нет задач</h3>
-            <p>Создайте первую задачу, нажав на кнопку "Новая задача"</p>
+            <p>{showCompleted ? 'Нет завершенных задач' : 'Создайте первую задачу'}</p>
           </div>
         ) : (
           <div className="tasks-table">
             <table>
               <thead>
                 <tr>
-                  <th>Название</th>
-                  <th>Исполнитель</th>
-                  <th>Группа</th>
-                  <th>Rice Score</th>
-                  <th>Эйзенхауэр</th>
-                  <th style={{ width: '100px' }}>Действия</th>
+                  <th style={{ width: '40px' }}></th>
+                  <th>
+                    <div>Название</div>
+                    {!showCompleted && (
+                      <input
+                        type="text"
+                        placeholder="Поиск..."
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          padding: '6px 8px',
+                          fontSize: '13px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )}
+                  </th>
+                  <th>
+                    <div>Исполнитель</div>
+                    {!showCompleted && (
+                      <select
+                        value={filters.assignee}
+                        onChange={(e) => handleFilterChange('assignee', e.target.value)}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          padding: '6px 8px',
+                          fontSize: '13px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="">Все</option>
+                        {uniqueAssignees.map(assignee => (
+                          <option key={assignee} value={assignee}>{assignee}</option>
+                        ))}
+                      </select>
+                    )}
+                  </th>
+                  <th>
+                    <div>Приоритет</div>
+                    {!showCompleted && (
+                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {['Low', 'Medium', 'High', 'Highest'].map(priority => (
+                          <label key={priority} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={filters.priority.includes(priority)}
+                              onChange={() => handlePriorityToggle(priority)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            {priority}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </th>
+                  {!projectId && (
+                    <th>
+                      <div>Проект</div>
+                      {!showCompleted && (
+                        <select
+                          value={filters.project_id}
+                          onChange={(e) => handleFilterChange('project_id', e.target.value)}
+                          style={{
+                            width: '100%',
+                            marginTop: '8px',
+                            padding: '6px 8px',
+                            fontSize: '13px',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '4px'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="">Все</option>
+                          {projects.map(project => (
+                            <option key={project.id} value={project.id}>
+                              {project.icon} {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </th>
+                  )}
+                  <th>
+                    <div>Priority Score</div>
+                    {!showCompleted && (
+                      <select
+                        value={filters.rice_category}
+                        onChange={(e) => handleFilterChange('rice_category', e.target.value)}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          padding: '6px 8px',
+                          fontSize: '13px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="">Все</option>
+                        <option value="В работу">В работу</option>
+                        <option value="Кандидат">Кандидат</option>
+                        <option value="Требуется уточнение">Уточнение</option>
+                        <option value="Не берём">Не берём</option>
+                      </select>
+                    )}
+                  </th>
+                  <th style={{ width: '100px' }}>
+                    <div>Действия</div>
+                    {!showCompleted && filters.search === '' && filters.assignee === '' &&
+                     filters.priority.length === 0 && filters.project_id === '' && filters.rice_category === '' ? null : (
+                      <button
+                        onClick={clearFilters}
+                        style={{
+                          marginTop: '8px',
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          backgroundColor: 'white',
+                          cursor: 'pointer',
+                          width: '100%'
+                        }}
+                      >
+                        Сброс
+                      </button>
+                    )}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.map(task => (
-                  <tr key={task.id}>
+                  <tr key={task.id} style={{ opacity: task.is_completed ? 0.6 : 1 }}>
                     <td>
-                      <strong>{task.title}</strong>
-                      {task.description && (
-                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                          {task.description.substring(0, 100)}
-                          {task.description.length > 100 && '...'}
-                        </div>
-                      )}
-                      {task.link && (
-                        <div style={{ marginTop: '4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={task.is_completed}
+                        onChange={() => handleToggleCompleted(task)}
+                        style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        title={task.is_completed ? 'Вернуть в работу' : 'Отметить выполненной'}
+                      />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong style={{ textDecoration: task.is_completed ? 'line-through' : 'none' }}>
+                          {task.title}
+                        </strong>
+                        {task.link && (
                           <a
                             href={task.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ fontSize: '0.85rem', color: '#3b82f6' }}
+                            style={{ color: '#3b82f6', display: 'inline-flex' }}
+                            title="Открыть ссылку"
                           >
-                            Открыть ссылку
+                            <ExternalLink size={14} />
                           </a>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                     <td>{task.assignee || '-'}</td>
-                    <td>{task.group?.name || '-'}</td>
+                    <td>{getPriorityBadge(task.priority || task.auto_priority) || '-'}</td>
+                    {!projectId && (
+                      <td>
+                        {task.project ? (
+                          <span>
+                            {task.project.icon && `${task.project.icon} `}
+                            {task.project.name}
+                          </span>
+                        ) : '-'}
+                      </td>
+                    )}
                     <td>{getRiceBadge(task) || '-'}</td>
-                    <td>{task.eisenhower_quadrant || '-'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button
@@ -185,7 +531,7 @@ const AllTasks = () => {
                           onClick={() => handleDeleteTask(task.id)}
                           title="Удалить"
                         >
-                          <Trash2 size={14} />
+                          <XIcon size={14} />
                         </button>
                       </div>
                     </td>
@@ -206,37 +552,6 @@ const AllTasks = () => {
           }}
           onSave={loadData}
         />
-      )}
-
-      {showGroupModal && (
-        <div className="modal-overlay" onClick={() => setShowGroupModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Создать группу</h3>
-              <button className="close-btn" onClick={() => setShowGroupModal(false)}>×</button>
-            </div>
-            <form onSubmit={handleCreateGroup}>
-              <div className="form-group">
-                <label>Название группы *</label>
-                <input
-                  type="text"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowGroupModal(false)}>
-                  Отмена
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Создать
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </>
   );

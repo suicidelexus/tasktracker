@@ -9,13 +9,13 @@ const api = axios.create({
   },
 });
 
-// Task Groups
-export const taskGroupsAPI = {
-  getAll: () => api.get('/groups/'),
-  getById: (id) => api.get(`/groups/${id}`),
-  create: (data) => api.post('/groups/', data),
-  update: (id, data) => api.put(`/groups/${id}`, data),
-  delete: (id) => api.delete(`/groups/${id}`),
+// Projects
+export const projectsAPI = {
+  getAll: () => api.get('/projects/'),
+  getById: (id) => api.get(`/projects/${id}`),
+  create: (data) => api.post('/projects/', data),
+  update: (id, data) => api.put(`/projects/${id}`, data),
+  delete: (id) => api.delete(`/projects/${id}`),
 };
 
 // Tasks
@@ -29,7 +29,7 @@ export const tasksAPI = {
 
 // Analytics
 export const analyticsAPI = {
-  getRiceScoring: () => api.get('/analytics/rice'),
+  getRiceScoring: (params) => api.get('/analytics/rice', { params }),
   getEisenhowerMatrix: () => api.get('/analytics/eisenhower'),
 };
 

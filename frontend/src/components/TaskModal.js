@@ -1,49 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { tasksAPI, taskGroupsAPI } from '../services/api';
+import { tasksAPI, projectsAPI } from '../services/api';
 
-const TaskModal = ({ task, onClose, onSave }) => {
+const TaskModal = ({ task, onClose, onSave, isDraft = false }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     link: '',
     assignee: '',
+    priority: '',
+    is_completed: false,
+    is_draft: isDraft,
     value: '',
     reach: '',
     budget_impact: '',
     confidence: '',
     is_important: '',
     is_urgent: '',
-    group_id: '',
+    project_id: '',
   });
 
-  const [groups, setGroups] = useState([]);
+  const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    loadGroups();
+    loadProjects();
     if (task) {
       setFormData({
         title: task.title || '',
         description: task.description || '',
         link: task.link || '',
         assignee: task.assignee || '',
+        priority: task.priority || '',
+        is_completed: task.is_completed || false,
+        is_draft: task.is_draft || false,
         value: task.value || '',
         reach: task.reach || '',
         budget_impact: task.budget_impact || '',
         confidence: task.confidence || '',
         is_important: task.is_important !== undefined ? task.is_important : '',
         is_urgent: task.is_urgent !== undefined ? task.is_urgent : '',
-        group_id: task.group_id || '',
+        project_id: task.project_id || '',
       });
     }
   }, [task]);
 
-  const loadGroups = async () => {
+  const loadProjects = async () => {
     try {
-      const response = await taskGroupsAPI.getAll();
-      setGroups(response.data);
+      const response = await projectsAPI.getAll();
+      setProjects(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки групп:', error);
+      console.error('Ошибка загрузки проектов:', error);
     }
   };
 
@@ -60,13 +66,15 @@ const TaskModal = ({ task, onClose, onSave }) => {
     try {
       const dataToSend = {
         ...formData,
+        is_completed: Boolean(formData.is_completed),
+        is_draft: Boolean(formData.is_draft),
         value: formData.value ? parseInt(formData.value) : null,
         reach: formData.reach ? parseInt(formData.reach) : null,
         budget_impact: formData.budget_impact ? parseFloat(formData.budget_impact) : null,
         confidence: formData.confidence ? parseInt(formData.confidence) : null,
         is_important: formData.is_important !== '' ? parseInt(formData.is_important) : null,
         is_urgent: formData.is_urgent !== '' ? parseInt(formData.is_urgent) : null,
-        group_id: formData.group_id || null,
+        project_id: formData.project_id || null,
       };
 
       if (task) {
@@ -134,18 +142,31 @@ const TaskModal = ({ task, onClose, onSave }) => {
             </div>
 
             <div className="form-group">
-              <label>Группа</label>
-              <select name="group_id" value={formData.group_id} onChange={handleChange}>
-                <option value="">Без группы</option>
-                {groups.map(group => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
+              <label>Проект</label>
+              <select name="project_id" value={formData.project_id} onChange={handleChange}>
+                <option value="">Без проекта</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.icon ? `${project.icon} ` : ''}{project.name}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
+          <div className="form-group">
+            <label>Приоритет</label>
+            <select name="priority" value={formData.priority} onChange={handleChange}>
+              <option value="">Не указано</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Highest">Highest</option>
+            </select>
+          </div>
+
           <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#475569' }}>
-            Rice Scoring (опционально)
+            Priority Score (опционально)
           </h4>
 
           <div className="form-row">

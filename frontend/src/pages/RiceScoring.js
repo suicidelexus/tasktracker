@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { Plus, ArrowRight } from 'lucide-react';
 import { analyticsAPI } from '../services/api';
+import TaskModal from '../components/TaskModal';
 
 const RiceScoring = () => {
-  const [tasks, setTasks] = useState([]);
+  const [draftTasks, setDraftTasks] = useState([]);
+  const [regularTasks, setRegularTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferringTask, setTransferringTask] = useState(null);
 
   useEffect(() => {
     loadTasks();
@@ -12,13 +18,26 @@ const RiceScoring = () => {
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const response = await analyticsAPI.getRiceScoring();
-      setTasks(response.data);
+      const [draftsResponse, regularResponse] = await Promise.all([
+        analyticsAPI.getRiceScoring({ is_draft: true }),
+        analyticsAPI.getRiceScoring({ is_draft: false })
+      ]);
+      setDraftTasks(draftsResponse.data);
+      setRegularTasks(regularResponse.data);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTransferToAll = (task) => {
+    setTransferringTask(task);
+    setShowTransferModal(true);
+  };
+
+  const handleSaveTransfer = async () => {
+    loadTasks();
   };
 
   const getRiceBadgeClass = (category) => {
@@ -27,6 +46,56 @@ const RiceScoring = () => {
     if (category === 'Требуется уточнение') return 'badge-warning';
     return 'badge-danger';
   };
+
+  const renderTasksTable = (tasks, showTransferButton = false) => (
+    <div className="tasks-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th style={{ textAlign: 'center' }}>Value</th>
+            <th style={{ textAlign: 'center' }}>Reach</th>
+            <th style={{ textAlign: 'center' }}>Budget</th>
+            <th style={{ textAlign: 'center' }}>Confidence</th>
+            <th style={{ textAlign: 'center' }}>Score</th>
+            <th>Решение</th>
+            {showTransferButton && <th style={{ width: '150px' }}>Действия</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map(task => (
+            <tr key={task.id}>
+              <td><strong>{task.title}</strong></td>
+              <td style={{ textAlign: 'center' }}>{task.value}</td>
+              <td style={{ textAlign: 'center' }}>{task.reach}</td>
+              <td style={{ textAlign: 'center' }}>{task.budget_impact}</td>
+              <td style={{ textAlign: 'center' }}>{task.confidence}%</td>
+              <td style={{ textAlign: 'center' }}>
+                <strong style={{ fontSize: '1.1rem' }}>{task.rice_score.toFixed(1)}</strong>
+              </td>
+              <td>
+                <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>
+                  {task.rice_category}
+                </span>
+              </td>
+              {showTransferButton && (
+                <td>
+                  <button
+                    className="btn btn-primary btn-small"
+                    onClick={() => handleTransferToAll(task)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <ArrowRight size={14} />
+                    Перенести
+                  </button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -39,12 +108,19 @@ const RiceScoring = () => {
   return (
     <>
       <div className="header">
-        <h2>Rice Scoring</h2>
+        <h2>Priority Score</h2>
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowDraftModal(true)}
+        >
+          <Plus size={18} />
+          Создать черновик задачи
+        </button>
       </div>
 
       <div className="content-area">
         <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-          <h3 style={{ marginBottom: '15px' }}>О методике Rice Scoring</h3>
+          <h3 style={{ marginBottom: '15px' }}>О методике Priority Score (Rice Scoring)</h3>
           <p style={{ marginBottom: '10px', color: '#475569' }}>
             <strong>Priority Score = Value × Reach × Budget Impact × Confidence</strong>
           </p>
@@ -84,57 +160,54 @@ const RiceScoring = () => {
           </div>
         </div>
 
-        {tasks.length === 0 ? (
-          <div className="empty-state">
-            <h3>Нет оцененных задач</h3>
-            <p>Добавьте Rice Scoring параметры к задачам для их отображения здесь</p>
-          </div>
-        ) : (
-          <div className="tasks-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Название</th>
-                  <th style={{ textAlign: 'center' }}>Value</th>
-                  <th style={{ textAlign: 'center' }}>Reach</th>
-                  <th style={{ textAlign: 'center' }}>Budget</th>
-                  <th style={{ textAlign: 'center' }}>Confidence</th>
-                  <th style={{ textAlign: 'center' }}>Score</th>
-                  <th>Категория</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map(task => (
-                  <tr key={task.id}>
-                    <td>
-                      <strong>{task.title}</strong>
-                      {task.assignee && (
-                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                          Исполнитель: {task.assignee}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>{task.value}</td>
-                    <td style={{ textAlign: 'center' }}>{task.reach}</td>
-                    <td style={{ textAlign: 'center' }}>{task.budget_impact}</td>
-                    <td style={{ textAlign: 'center' }}>{task.confidence}%</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <strong style={{ fontSize: '1.1rem', color: '#1e293b' }}>
-                        {task.rice_score.toFixed(1)}
-                      </strong>
-                    </td>
-                    <td>
-                      <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>
-                        {task.rice_category}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {draftTasks.length > 0 && (
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{ marginBottom: '15px', color: '#475569' }}>
+              Черновики (предварительная оценка)
+            </h3>
+            {renderTasksTable(draftTasks, true)}
           </div>
         )}
+
+        <h3 style={{ marginBottom: '15px', color: '#475569' }}>
+          {draftTasks.length > 0 ? 'Задачи в работе' : 'Все оцененные задачи'}
+        </h3>
+        {regularTasks.length === 0 ? (
+          <div className="empty-state">
+            <h3>Нет оцененных задач</h3>
+            <p>Добавьте Priority Score параметры к задачам для их отображения здесь</p>
+          </div>
+        ) : (
+          renderTasksTable(regularTasks, false)
+        )}
       </div>
+
+      {showDraftModal && (
+        <TaskModal
+          onClose={() => setShowDraftModal(false)}
+          onSave={() => {
+            setShowDraftModal(false);
+            loadTasks();
+          }}
+          isDraft={true}
+        />
+      )}
+
+      {showTransferModal && transferringTask && (
+        <TaskModal
+          task={{ ...transferringTask, is_draft: false }}
+          onClose={() => {
+            setShowTransferModal(false);
+            setTransferringTask(null);
+          }}
+          onSave={() => {
+            setShowTransferModal(false);
+            setTransferringTask(null);
+            handleSaveTransfer();
+          }}
+          isDraft={false}
+        />
+      )}
     </>
   );
 };

@@ -10,7 +10,7 @@ echo Starting Backend and Frontend servers...
 echo.
 
 REM Start Backend in new window
-start "Task Tracker Backend" cmd /k "cd /d %~dp0 && echo Starting Backend on http://0.0.0.0:8080 && py main.py"
+start "Task Tracker Backend" cmd /k "cd /d %~dp0 && color 0A && echo Starting Backend on http://localhost:8080 && py -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
 
 REM Wait 3 seconds for backend to start
 timeout /t 3 /nobreak > nul

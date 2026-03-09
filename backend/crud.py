@@ -3,39 +3,43 @@ from typing import Optional, List
 from backend import models, schemas
 
 
-# TaskGroup CRUD
-def create_task_group(db: Session, group: schemas.TaskGroupCreate):
-    db_group = models.TaskGroup(**group.model_dump())
-    db.add(db_group)
+# Project CRUD
+def create_project(db: Session, project: schemas.ProjectCreate):
+    db_project = models.Project(**project.model_dump())
+    db.add(db_project)
     db.commit()
-    db.refresh(db_group)
-    return db_group
+    db.refresh(db_project)
+    return db_project
 
 
-def get_task_groups(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.TaskGroup).offset(skip).limit(limit).all()
+def get_projects(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Project).offset(skip).limit(limit).all()
 
 
-def get_task_group(db: Session, group_id: int):
-    return db.query(models.TaskGroup).filter(models.TaskGroup.id == group_id).first()
+def get_project(db: Session, project_id: int):
+    return db.query(models.Project).filter(models.Project.id == project_id).first()
 
 
-def update_task_group(db: Session, group_id: int, group: schemas.TaskGroupUpdate):
-    db_group = get_task_group(db, group_id)
-    if db_group:
-        for key, value in group.model_dump(exclude_unset=True).items():
-            setattr(db_group, key, value)
+def get_project_by_name(db: Session, name: str):
+    return db.query(models.Project).filter(models.Project.name == name).first()
+
+
+def update_project(db: Session, project_id: int, project: schemas.ProjectUpdate):
+    db_project = get_project(db, project_id)
+    if db_project:
+        for key, value in project.model_dump(exclude_unset=True).items():
+            setattr(db_project, key, value)
         db.commit()
-        db.refresh(db_group)
-    return db_group
+        db.refresh(db_project)
+    return db_project
 
 
-def delete_task_group(db: Session, group_id: int):
-    db_group = get_task_group(db, group_id)
-    if db_group:
-        db.delete(db_group)
+def delete_project(db: Session, project_id: int):
+    db_project = get_project(db, project_id)
+    if db_project:
+        db.delete(db_project)
         db.commit()
-    return db_group
+    return db_project
 
 
 # Task CRUD
@@ -51,14 +55,26 @@ def get_tasks(
     db: Session,
     skip: int = 0,
     limit: int = 100,
-    group_id: Optional[int] = None,
+    project_id: Optional[int] = None,
     search: Optional[str] = None,
-    assignee: Optional[str] = None
+    assignee: Optional[str] = None,
+    priority: Optional[str] = None,
+    rice_category: Optional[str] = None,
+    is_completed: Optional[bool] = None,
+    is_draft: Optional[bool] = None
 ):
     query = db.query(models.Task)
 
-    if group_id is not None:
-        query = query.filter(models.Task.group_id == group_id)
+    # Фильтр по завершенности
+    if is_completed is not None:
+        query = query.filter(models.Task.is_completed == is_completed)
+
+    # Фильтр по черновикам
+    if is_draft is not None:
+        query = query.filter(models.Task.is_draft == is_draft)
+
+    if project_id is not None:
+        query = query.filter(models.Task.project_id == project_id)
 
     if search:
         search_filter = f"%{search}%"
@@ -69,6 +85,9 @@ def get_tasks(
 
     if assignee:
         query = query.filter(models.Task.assignee == assignee)
+
+    if priority:
+        query = query.filter(models.Task.priority == priority)
 
     return query.offset(skip).limit(limit).all()
 
@@ -96,14 +115,19 @@ def delete_task(db: Session, task_id: int):
 
 
 # Analytics
-def get_tasks_with_rice_score(db: Session):
+def get_tasks_with_rice_score(db: Session, is_draft: Optional[bool] = None):
     """Получить все задачи с Rice Score"""
-    tasks = db.query(models.Task).filter(
+    query = db.query(models.Task).filter(
         models.Task.value.isnot(None),
         models.Task.reach.isnot(None),
         models.Task.budget_impact.isnot(None),
         models.Task.confidence.isnot(None)
-    ).all()
+    )
+
+    if is_draft is not None:
+        query = query.filter(models.Task.is_draft == is_draft)
+
+    tasks = query.all()
 
     # Сортируем по rice_score
     return sorted(tasks, key=lambda t: t.rice_score or 0, reverse=True)

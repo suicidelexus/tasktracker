@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.database import engine, Base
 from backend.routers import router
+from backend import models  # Импорт моделей для регистрации в Base
 import os
 
 # Создание таблиц в БД
@@ -32,7 +33,3 @@ def health_check():
     return {"status": "ok", "message": "Task Tracker API is running"}
 
 
-if __name__ == "__main__":
-    import uvicorn
-    # Запуск сервера на всех интерфейсах (0.0.0.0) для доступа из локальной сети
-    uvicorn.run(app, host="0.0.0.0", port=8080)

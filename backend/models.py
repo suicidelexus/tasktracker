@@ -1,16 +1,17 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from backend.database import Base
 
 
-class TaskGroup(Base):
-    __tablename__ = "task_groups"
+class Project(Base):
+    __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
+    icon = Column(String, nullable=True)  # Эмодзи или иконка для проекта
 
-    tasks = relationship("Task", back_populates="group", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -21,6 +22,9 @@ class Task(Base):
     description = Column(Text, nullable=True)
     link = Column(String, nullable=True)  # Ссылка на Идеичную
     assignee = Column(String, nullable=True)  # Исполнитель
+    priority = Column(String, nullable=True)  # Low, Medium, High, Highest
+    is_completed = Column(Boolean, default=False, nullable=False)  # Завершена ли задача
+    is_draft = Column(Boolean, default=False, nullable=False)  # Черновик (для Priority Score)
 
     # Rice Scoring параметры
     value = Column(Integer, nullable=True)  # 1-5
@@ -32,9 +36,9 @@ class Task(Base):
     is_important = Column(Integer, nullable=True)  # 0 = нет, 1 = да
     is_urgent = Column(Integer, nullable=True)  # 0 = нет, 1 = да
 
-    # Связь с группой
-    group_id = Column(Integer, ForeignKey("task_groups.id"), nullable=True)
-    group = relationship("TaskGroup", back_populates="tasks")
+    # Связь с проектом
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    project = relationship("Project", back_populates="tasks")
 
     @property
     def rice_score(self):
@@ -42,6 +46,21 @@ class Task(Base):
         if all([self.value, self.reach, self.budget_impact, self.confidence]):
             return self.value * self.reach * self.budget_impact * (self.confidence / 100)
         return None
+
+    @property
+    def auto_priority(self):
+        """Автоматический приоритет на основе Rice Score"""
+        score = self.rice_score
+        if score is None:
+            return None
+        if score >= 40:
+            return "Highest"
+        elif score >= 25:
+            return "High"
+        elif score >= 10:
+            return "Medium"
+        else:
+            return "Low"
 
     @property
     def rice_category(self):
