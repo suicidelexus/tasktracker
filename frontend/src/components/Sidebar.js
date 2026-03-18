@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ListTodo, BarChart3, Grid2X2, CheckCircle, Plus, ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
+import { Menu, X, ListTodo, BarChart3, Grid2X2, CheckCircle, Plus, ChevronDown, ChevronRight, FolderOpen, HelpCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { projectsAPI } from '../services/api';
 
-const Sidebar = ({ onCreateProject }) => {
+const Sidebar = ({ onCreateProject, onOpenHelp }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showProjects, setShowProjects] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -128,6 +128,28 @@ const Sidebar = ({ onCreateProject }) => {
                 <CheckCircle size={20} />
                 {isExpanded && <span>Завершенные</span>}
               </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div className="sidebar-section" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(148, 163, 184, 0.2)' }}>
+          <ul className="sidebar-menu">
+            <li>
+              <button
+                onClick={onOpenHelp}
+                className="menu-item"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  width: '100%',
+                  textAlign: 'left'
+                }}
+              >
+                <HelpCircle size={20} />
+                {isExpanded && <span>Справка</span>}
+              </button>
             </li>
           </ul>
         </div>

@@ -2,9 +2,10 @@
 import { Plus, Pencil, Trash2, Upload, Download, ChevronDown, ExternalLink, X as XIcon } from 'lucide-react';
 import { tasksAPI, projectsAPI } from '../services/api';
 import TaskModal from '../components/TaskModal';
+import ExcelFilter from '../components/ExcelFilter';
 import axios from 'axios';
 
-const AllTasks = ({ projectId = null, showCompleted = false }) => {
+const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false }) => {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,10 +18,10 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
 
   const [filters, setFilters] = useState({
     search: '',
-    assignee: '',
+    assignee: [],
     priority: [],
-    project_id: '',
-    rice_category: ''
+    project_id: [],
+    rice_category: []
   });
 
   const [uniqueAssignees, setUniqueAssignees] = useState([]);
@@ -48,9 +49,9 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
       };
       if (projectId) params.project_id = projectId;
       if (filters.search) params.search = filters.search;
-      if (filters.assignee) params.assignee = filters.assignee;
+      if (filters.assignee.length > 0) params.assignee = filters.assignee[0]; // Backend поддерживает один assignee
       if (filters.priority.length > 0) params.priority = filters.priority.join(',');
-      if (filters.project_id && !projectId) params.project_id = filters.project_id;
+      if (filters.project_id.length > 0 && !projectId) params.project_id = filters.project_id[0];
 
       const [tasksResponse, projectsResponse] = await Promise.all([
         tasksAPI.getAll(params),
@@ -58,13 +59,29 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
       ]);
 
       let filteredTasks = tasksResponse.data;
-      if (filters.rice_category) {
-        filteredTasks = filteredTasks.filter(task => task.rice_category === filters.rice_category);
+
+      // Дополнительная клиентская фильтрация
+      if (filters.assignee.length > 0) {
+        filteredTasks = filteredTasks.filter(task =>
+          filters.assignee.includes(task.assignee)
+        );
+      }
+
+      if (filters.project_id.length > 0 && !projectId) {
+        filteredTasks = filteredTasks.filter(task =>
+          filters.project_id.includes(task.project_id)
+        );
+      }
+
+      if (filters.rice_category.length > 0) {
+        filteredTasks = filteredTasks.filter(task =>
+          filters.rice_category.includes(task.rice_category)
+        );
       }
 
       setTasks(filteredTasks);
       setProjects(projectsResponse.data);
-      const assignees = [...new Set(filteredTasks.map(t => t.assignee).filter(Boolean))];
+      const assignees = [...new Set(tasksResponse.data.map(t => t.assignee).filter(Boolean))];
       setUniqueAssignees(assignees);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
@@ -184,27 +201,37 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
     );
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handlePriorityToggle = (priority) => {
-    setFilters(prev => ({
-      ...prev,
-      priority: prev.priority.includes(priority)
-        ? prev.priority.filter(p => p !== priority)
-        : [...prev.priority, priority]
-    }));
-  };
 
   const clearFilters = () => {
     setFilters({
       search: '',
-      assignee: '',
+      assignee: [],
       priority: [],
-      project_id: '',
-      rice_category: ''
+      project_id: [],
+      rice_category: []
     });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.search !== '' ||
+           Object.keys(filters).some(key => key !== 'search' && filters[key].length > 0);
+  };
+
+  // Получение уникальных значений для фильтров
+  const getUniqueValues = (field) => {
+    const allTasks = tasks; // Используем текущие задачи
+    const values = allTasks.map(task => {
+      if (field === 'project_id' && task.project) {
+        return task.project.name;
+      }
+      return task[field];
+    }).filter(v => v !== null && v !== undefined && v !== '');
+    return [...new Set(values)].sort();
+  };
+
+  const getProjectNameById = (projectId) => {
+    const project = projects.find(p => p.id === projectId);
+    return project ? project.name : '';
   };
 
   if (loading) {
@@ -217,9 +244,10 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
 
   return (
     <>
-      <div className="header">
-        <h2>{showCompleted ? 'Завершенные задачи' : projectId ? 'Проект' : 'Все задачи'}</h2>
-        {!showCompleted && (
+      {!hideHeader && (
+        <div className="header">
+          <h2>{showCompleted ? 'Завершенные задачи' : projectId ? 'Проект' : 'Все задачи'}</h2>
+          {!showCompleted && (
           <div style={{ display: 'flex', gap: '10px' }}>
             <div style={{ position: 'relative' }} ref={dropdownRef}>
               <button
@@ -325,6 +353,7 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
           </div>
         )}
       </div>
+      )}
 
       <div className="content-area">
 
@@ -340,137 +369,94 @@ const AllTasks = ({ projectId = null, showCompleted = false }) => {
                 <tr>
                   <th style={{ width: '40px' }}></th>
                   <th>
-                    <div>Название</div>
-                    {!showCompleted && (
-                      <input
-                        type="text"
-                        placeholder="Поиск..."
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                        style={{
-                          width: '100%',
-                          marginTop: '8px',
-                          padding: '6px 8px',
-                          fontSize: '13px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '4px'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Название
+                      <ExcelFilter
+                        field="search"
+                        label="Название"
+                        isSearch={true}
+                        searchValue={filters.search}
+                        onSearchChange={(value) => setFilters(prev => ({ ...prev, search: value }))}
                       />
-                    )}
+                    </div>
                   </th>
                   <th>
-                    <div>Исполнитель</div>
-                    {!showCompleted && (
-                      <select
-                        value={filters.assignee}
-                        onChange={(e) => handleFilterChange('assignee', e.target.value)}
-                        style={{
-                          width: '100%',
-                          marginTop: '8px',
-                          padding: '6px 8px',
-                          fontSize: '13px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '4px'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value="">Все</option>
-                        {uniqueAssignees.map(assignee => (
-                          <option key={assignee} value={assignee}>{assignee}</option>
-                        ))}
-                      </select>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Исполнитель
+                      <ExcelFilter
+                        field="assignee"
+                        label="Исполнитель"
+                        values={getUniqueValues('assignee')}
+                        selectedValues={filters.assignee}
+                        onChange={(values) => setFilters(prev => ({ ...prev, assignee: values }))}
+                      />
+                    </div>
                   </th>
                   <th>
-                    <div>Приоритет</div>
-                    {!showCompleted && (
-                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {['Low', 'Medium', 'High', 'Highest'].map(priority => (
-                          <label key={priority} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                            <input
-                              type="checkbox"
-                              checked={filters.priority.includes(priority)}
-                              onChange={() => handlePriorityToggle(priority)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            {priority}
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Приоритет
+                      <ExcelFilter
+                        field="priority"
+                        label="Приоритет"
+                        values={['Low', 'Medium', 'High', 'Highest']}
+                        selectedValues={filters.priority}
+                        onChange={(values) => setFilters(prev => ({ ...prev, priority: values }))}
+                      />
+                    </div>
                   </th>
                   {!projectId && (
                     <th>
-                      <div>Проект</div>
-                      {!showCompleted && (
-                        <select
-                          value={filters.project_id}
-                          onChange={(e) => handleFilterChange('project_id', e.target.value)}
-                          style={{
-                            width: '100%',
-                            marginTop: '8px',
-                            padding: '6px 8px',
-                            fontSize: '13px',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '4px'
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Проект
+                        <ExcelFilter
+                          field="project_id"
+                          label="Проект"
+                          values={projects.map(p => p.name)}
+                          selectedValues={filters.project_id.map(id => {
+                            const project = projects.find(p => p.id === id);
+                            return project ? project.name : '';
+                          }).filter(Boolean)}
+                          onChange={(names) => {
+                            const ids = names.map(name => projects.find(p => p.name === name)?.id).filter(Boolean);
+                            setFilters(prev => ({ ...prev, project_id: ids }));
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="">Все</option>
-                          {projects.map(project => (
-                            <option key={project.id} value={project.id}>
-                              {project.icon} {project.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                        />
+                      </div>
                     </th>
                   )}
                   <th>
-                    <div>Priority Score</div>
-                    {!showCompleted && (
-                      <select
-                        value={filters.rice_category}
-                        onChange={(e) => handleFilterChange('rice_category', e.target.value)}
-                        style={{
-                          width: '100%',
-                          marginTop: '8px',
-                          padding: '6px 8px',
-                          fontSize: '13px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '4px'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value="">Все</option>
-                        <option value="В работу">В работу</option>
-                        <option value="Кандидат">Кандидат</option>
-                        <option value="Требуется уточнение">Уточнение</option>
-                        <option value="Не берём">Не берём</option>
-                      </select>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Priority Score
+                      <ExcelFilter
+                        field="rice_category"
+                        label="Priority Score"
+                        values={['В работу', 'Кандидат', 'Требуется уточнение', 'Не берём']}
+                        selectedValues={filters.rice_category}
+                        onChange={(values) => setFilters(prev => ({ ...prev, rice_category: values }))}
+                      />
+                    </div>
                   </th>
                   <th style={{ width: '100px' }}>
-                    <div>Действия</div>
-                    {!showCompleted && filters.search === '' && filters.assignee === '' &&
-                     filters.priority.length === 0 && filters.project_id === '' && filters.rice_category === '' ? null : (
-                      <button
-                        onClick={clearFilters}
-                        style={{
-                          marginTop: '8px',
-                          padding: '4px 8px',
-                          fontSize: '11px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '4px',
-                          backgroundColor: 'white',
-                          cursor: 'pointer',
-                          width: '100%'
-                        }}
-                      >
-                        Сброс
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      Действия
+                      {hasActiveFilters() && (
+                        <button
+                          onClick={clearFilters}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            padding: '4px',
+                            fontWeight: '500'
+                          }}
+                          title="Сбросить все фильтры"
+                        >
+                          <XIcon size={16} />
+                        </button>
+                      )}
+                    </div>
                   </th>
                 </tr>
               </thead>

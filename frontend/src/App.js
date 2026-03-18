@@ -7,15 +7,21 @@ import EisenhowerMatrix from './pages/EisenhowerMatrix';
 import Completed from './pages/Completed';
 import ProjectView from './pages/ProjectView';
 import ProjectModal from './components/ProjectModal';
+import HelpModal from './components/HelpModal';
 import { projectsAPI } from './services/api';
 import './index.css';
 
 function App() {
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [sidebarKey, setSidebarKey] = useState(0);
 
   const handleCreateProject = () => {
     setShowProjectModal(true);
+  };
+
+  const handleOpenHelp = () => {
+    setShowHelpModal(true);
   };
 
   const handleSaveProject = async (projectData) => {
@@ -36,6 +42,7 @@ function App() {
         <Sidebar
           key={sidebarKey}
           onCreateProject={handleCreateProject}
+          onOpenHelp={handleOpenHelp}
         />
         <div className="main-content">
           <Routes>
@@ -52,6 +59,13 @@ function App() {
         <ProjectModal
           onClose={() => setShowProjectModal(false)}
           onSave={handleSaveProject}
+        />
+      )}
+
+      {showHelpModal && (
+        <HelpModal
+          isOpen={showHelpModal}
+          onClose={() => setShowHelpModal(false)}
         />
       )}
     </Router>

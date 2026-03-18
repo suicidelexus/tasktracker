@@ -37,6 +37,10 @@ def update_project(db: Session, project_id: int, project: schemas.ProjectUpdate)
 def delete_project(db: Session, project_id: int):
     db_project = get_project(db, project_id)
     if db_project:
+        # Переносим все задачи проекта в "Без проекта" (project_id = None)
+        db.query(models.Task).filter(models.Task.project_id == project_id).update(
+            {"project_id": None}
+        )
         db.delete(db_project)
         db.commit()
     return db_project

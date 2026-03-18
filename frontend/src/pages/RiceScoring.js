@@ -2,14 +2,24 @@
 import { Plus, ArrowRight } from 'lucide-react';
 import { analyticsAPI } from '../services/api';
 import TaskModal from '../components/TaskModal';
+import ExcelFilter from '../components/ExcelFilter';
 
 const RiceScoring = () => {
   const [draftTasks, setDraftTasks] = useState([]);
-  const [regularTasks, setRegularTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferringTask, setTransferringTask] = useState(null);
+
+  // Фильтры
+  const [filters, setFilters] = useState({
+    title: '',
+    value: [],
+    reach: [],
+    budget_impact: [],
+    confidence: [],
+    rice_category: []
+  });
 
   useEffect(() => {
     loadTasks();
@@ -18,12 +28,10 @@ const RiceScoring = () => {
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const [draftsResponse, regularResponse] = await Promise.all([
-        analyticsAPI.getRiceScoring({ is_draft: true }),
-        analyticsAPI.getRiceScoring({ is_draft: false })
-      ]);
-      setDraftTasks(draftsResponse.data);
-      setRegularTasks(regularResponse.data);
+      const response = await analyticsAPI.getRiceScoring({ is_draft: true });
+      // Сортируем по Score от большего к меньшему
+      const sorted = response.data.sort((a, b) => b.rice_score - a.rice_score);
+      setDraftTasks(sorted);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {
@@ -37,7 +45,8 @@ const RiceScoring = () => {
   };
 
   const handleSaveTransfer = async () => {
-    loadTasks();
+    // Задача должна исчезнуть из списка сразу
+    setDraftTasks(prevTasks => prevTasks.filter(t => t.id !== transferringTask.id));
   };
 
   const getRiceBadgeClass = (category) => {
@@ -47,55 +56,70 @@ const RiceScoring = () => {
     return 'badge-danger';
   };
 
-  const renderTasksTable = (tasks, showTransferButton = false) => (
-    <div className="tasks-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th style={{ textAlign: 'center' }}>Value</th>
-            <th style={{ textAlign: 'center' }}>Reach</th>
-            <th style={{ textAlign: 'center' }}>Budget</th>
-            <th style={{ textAlign: 'center' }}>Confidence</th>
-            <th style={{ textAlign: 'center' }}>Score</th>
-            <th>Решение</th>
-            {showTransferButton && <th style={{ width: '150px' }}>Действия</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map(task => (
-            <tr key={task.id}>
-              <td><strong>{task.title}</strong></td>
-              <td style={{ textAlign: 'center' }}>{task.value}</td>
-              <td style={{ textAlign: 'center' }}>{task.reach}</td>
-              <td style={{ textAlign: 'center' }}>{task.budget_impact}</td>
-              <td style={{ textAlign: 'center' }}>{task.confidence}%</td>
-              <td style={{ textAlign: 'center' }}>
-                <strong style={{ fontSize: '1.1rem' }}>{task.rice_score.toFixed(1)}</strong>
-              </td>
-              <td>
-                <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>
-                  {task.rice_category}
-                </span>
-              </td>
-              {showTransferButton && (
-                <td>
-                  <button
-                    className="btn btn-primary btn-small"
-                    onClick={() => handleTransferToAll(task)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    <ArrowRight size={14} />
-                    Перенести
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  // Применение фильтров
+  const getFilteredTasks = () => {
+    return draftTasks.filter(task => {
+      // Фильтр по названию (поиск)
+      if (filters.title && !task.title.toLowerCase().includes(filters.title.toLowerCase())) {
+        return false;
+      }
+
+      // Фильтр по Value
+      if (filters.value.length > 0 && !filters.value.includes(task.value)) {
+        return false;
+      }
+
+      // Фильтр по Reach
+      if (filters.reach.length > 0 && !filters.reach.includes(task.reach)) {
+        return false;
+      }
+
+      // Фильтр по Budget Impact
+      if (filters.budget_impact.length > 0 && !filters.budget_impact.includes(task.budget_impact)) {
+        return false;
+      }
+
+      // Фильтр по Confidence
+      if (filters.confidence.length > 0 && !filters.confidence.includes(task.confidence)) {
+        return false;
+      }
+
+      // Фильтр по категории Score
+      if (filters.rice_category.length > 0 && !filters.rice_category.includes(task.rice_category)) {
+        return false;
+      }
+
+      return true;
+    });
+  };
+
+  // Получение уникальных значений для фильтров
+  const getUniqueValues = (field) => {
+    const values = draftTasks.map(task => task[field]);
+    return [...new Set(values)].sort((a, b) => {
+      if (typeof a === 'number') return b - a;
+      return String(a).localeCompare(String(b));
+    });
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      title: '',
+      value: [],
+      reach: [],
+      budget_impact: [],
+      confidence: [],
+      rice_category: []
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.title !== '' ||
+           Object.keys(filters).some(key => key !== 'title' && filters[key].length > 0);
+  };
+
+
+  const filteredTasks = getFilteredTasks();
 
   if (loading) {
     return (
@@ -109,76 +133,152 @@ const RiceScoring = () => {
     <>
       <div className="header">
         <h2>Priority Score</h2>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowDraftModal(true)}
-        >
-          <Plus size={18} />
-          Создать черновик задачи
-        </button>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {hasActiveFilters() && (
+            <button
+              className="btn btn-secondary"
+              onClick={clearFilters}
+              style={{ fontSize: '14px' }}
+            >
+              Сбросить фильтры
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowDraftModal(true)}
+          >
+            <Plus size={18} />
+            Создать черновик задачи
+          </button>
+        </div>
       </div>
 
       <div className="content-area">
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-          <h3 style={{ marginBottom: '15px' }}>О методике Priority Score (Rice Scoring)</h3>
-          <p style={{ marginBottom: '10px', color: '#475569' }}>
-            <strong>Priority Score = Value × Reach × Budget Impact × Confidence</strong>
-          </p>
-          <ul style={{ color: '#64748b', lineHeight: '1.6' }}>
-            <li><strong>Value (1-5)</strong> — влияние фичи на поведение пользователей</li>
-            <li><strong>Reach (1-5)</strong> — охват пользователей</li>
-            <li><strong>Budget Impact (1, 1.2, 1.5, 2)</strong> — влияние на бюджет</li>
-            <li><strong>Confidence (10-100%)</strong> — уверенность в оценке</li>
-          </ul>
-          <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid #e2e8f0' }}>Score</th>
-                  <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid #e2e8f0' }}>Решение</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '8px' }}><strong>40+</strong></td>
-                  <td style={{ padding: '8px' }}>Берём в работу</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px' }}><strong>25-39</strong></td>
-                  <td style={{ padding: '8px' }}>Кандидат в работу</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px' }}><strong>10-24</strong></td>
-                  <td style={{ padding: '8px' }}>Требуется уточнение (Discovery)</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px' }}><strong>0-9</strong></td>
-                  <td style={{ padding: '8px' }}>Не берём в работу / Icebox</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {draftTasks.length > 0 && (
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ marginBottom: '15px', color: '#475569' }}>
-              Черновики (предварительная оценка)
-            </h3>
-            {renderTasksTable(draftTasks, true)}
-          </div>
-        )}
-
-        <h3 style={{ marginBottom: '15px', color: '#475569' }}>
-          {draftTasks.length > 0 ? 'Задачи в работе' : 'Все оцененные задачи'}
-        </h3>
-        {regularTasks.length === 0 ? (
+        {draftTasks.length === 0 ? (
           <div className="empty-state">
-            <h3>Нет оцененных задач</h3>
-            <p>Добавьте Priority Score параметры к задачам для их отображения здесь</p>
+            <h3>Нет черновиков для оценки</h3>
+            <p>Создайте черновик задачи для предварительной оценки по Priority Score</p>
           </div>
         ) : (
-          renderTasksTable(regularTasks, false)
+          <>
+            <div className="tasks-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Название
+                        <ExcelFilter
+                          field="title"
+                          label="Название"
+                          isSearch={true}
+                          searchValue={filters.title}
+                          onSearchChange={(value) => setFilters(prev => ({ ...prev, title: value }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        Value
+                        <ExcelFilter
+                          field="value"
+                          label="Value"
+                          values={getUniqueValues('value')}
+                          selectedValues={filters.value}
+                          onChange={(values) => setFilters(prev => ({ ...prev, value: values }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        Reach
+                        <ExcelFilter
+                          field="reach"
+                          label="Reach"
+                          values={getUniqueValues('reach')}
+                          selectedValues={filters.reach}
+                          onChange={(values) => setFilters(prev => ({ ...prev, reach: values }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        Budget
+                        <ExcelFilter
+                          field="budget_impact"
+                          label="Budget Impact"
+                          values={getUniqueValues('budget_impact')}
+                          selectedValues={filters.budget_impact}
+                          onChange={(values) => setFilters(prev => ({ ...prev, budget_impact: values }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        Confidence
+                        <ExcelFilter
+                          field="confidence"
+                          label="Confidence"
+                          values={getUniqueValues('confidence')}
+                          selectedValues={filters.confidence}
+                          onChange={(values) => setFilters(prev => ({ ...prev, confidence: values }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ textAlign: 'center' }}>Score</th>
+                    <th>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Решение
+                        <ExcelFilter
+                          field="rice_category"
+                          label="Решение"
+                          values={getUniqueValues('rice_category')}
+                          selectedValues={filters.rice_category}
+                          onChange={(values) => setFilters(prev => ({ ...prev, rice_category: values }))}
+                        />
+                      </div>
+                    </th>
+                    <th style={{ width: '150px' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTasks.map(task => (
+                    <tr key={task.id}>
+                      <td><strong>{task.title}</strong></td>
+                      <td style={{ textAlign: 'center' }}>{task.value}</td>
+                      <td style={{ textAlign: 'center' }}>{task.reach}</td>
+                      <td style={{ textAlign: 'center' }}>{task.budget_impact}</td>
+                      <td style={{ textAlign: 'center' }}>{task.confidence}%</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <strong style={{ fontSize: '1.1rem' }}>{task.rice_score.toFixed(1)}</strong>
+                      </td>
+                      <td>
+                        <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>
+                          {task.rice_category}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-primary btn-small"
+                          onClick={() => handleTransferToAll(task)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <ArrowRight size={14} />
+                          Перенести
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredTasks.length === 0 && draftTasks.length > 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                Нет задач, соответствующих фильтрам
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -213,4 +313,5 @@ const RiceScoring = () => {
 };
 
 export default RiceScoring;
+
 

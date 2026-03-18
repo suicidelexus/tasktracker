@@ -15,9 +15,9 @@ def create_test_data():
     try:
         # Создаем проекты
         projects_data = [
-            {"name": "Copilot", "description": "Задачи по Copilot", "icon": "🤖"},
-            {"name": "DA", "description": "Задачи по Data Analytics", "icon": "📊"},
-            {"name": "Прочие", "description": "Прочие задачи", "icon": "📋"}
+            {"name": "Copilot", "description": "Задачи по Copilot", "icon": "robot"},
+            {"name": "DA", "description": "Задачи по Data Analytics", "icon": "chart"},
+            {"name": "Прочие", "description": "Прочие задачи", "icon": "list"}
         ]
 
         projects = {}

@@ -63,6 +63,4 @@ yarn-error.log*
 output.txt
 db_output.txt
 
-# Reports (internal)
-.cleanup_report.md
 
