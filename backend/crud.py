@@ -163,3 +163,26 @@ def get_tasks_by_eisenhower(db: Session):
 
     return result
 
+
+# Comments CRUD
+def create_comment(db: Session, task_id: int, text: str):
+    comment = models.Comment(task_id=task_id, text=text)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def get_comments(db: Session, task_id: int):
+    return db.query(models.Comment).filter(
+        models.Comment.task_id == task_id
+    ).order_by(models.Comment.created_at).all()
+
+
+def delete_comment(db: Session, comment_id: int):
+    comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if comment:
+        db.delete(comment)
+        db.commit()
+    return comment
+

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, Boolean, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 from backend.database import Base
 
 
@@ -39,6 +40,7 @@ class Task(Base):
     # Связь с проектом
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     project = relationship("Project", back_populates="tasks")
+    comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
 
     @property
     def rice_score(self):
@@ -91,4 +93,15 @@ class Task(Base):
             return "Не важно, срочно"
         else:
             return "Не важно, не срочно"
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    task = relationship("Task", back_populates="comments")
 

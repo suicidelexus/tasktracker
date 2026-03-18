@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
 
 class ProjectBase(BaseModel):
@@ -69,6 +70,20 @@ class Task(TaskBase):
     rice_category: str
     eisenhower_quadrant: Optional[str] = None
     project: Optional[Project] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CommentCreate(BaseModel):
+    text: str
+
+
+class Comment(BaseModel):
+    id: int
+    task_id: int
+    text: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

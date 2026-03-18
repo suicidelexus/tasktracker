@@ -85,6 +85,28 @@ def read_task(task_id: int, db: Session = Depends(get_db)):
     return db_task
 
 
+# Comments endpoints
+@router.post("/tasks/{task_id}/comments/", response_model=schemas.Comment)
+def create_comment(task_id: int, comment: schemas.CommentCreate, db: Session = Depends(get_db)):
+    if crud.get_task(db, task_id) is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return crud.create_comment(db, task_id, comment.text)
+
+
+@router.get("/tasks/{task_id}/comments/", response_model=List[schemas.Comment])
+def get_comments(task_id: int, db: Session = Depends(get_db)):
+    return crud.get_comments(db, task_id)
+
+
+@router.delete("/comments/{comment_id}")
+def delete_comment(comment_id: int, db: Session = Depends(get_db)):
+    comment = crud.delete_comment(db, comment_id)
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"message": "Comment deleted"}
+
+
+
 @router.put("/tasks/{task_id}", response_model=schemas.Task)
 def update_task(task_id: int, task: schemas.TaskUpdate, db: Session = Depends(get_db)):
     db_task = crud.update_task(db, task_id, task)

@@ -1,8 +1,9 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight, MessageSquare, AlignJustify, AlignLeft } from 'lucide-react';
 import { analyticsAPI } from '../services/api';
 import TaskModal from '../components/TaskModal';
 import ExcelFilter from '../components/ExcelFilter';
+import CommentsPanel from '../components/CommentsPanel';
 
 const RiceScoring = () => {
   const [draftTasks, setDraftTasks] = useState([]);
@@ -10,6 +11,8 @@ const RiceScoring = () => {
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferringTask, setTransferringTask] = useState(null);
+  const [commentsTask, setCommentsTask] = useState(null);
+  const [density, setDensity] = useState(() => localStorage.getItem('tableDensity') || 'comfortable');
 
   // Фильтры
   const [filters, setFilters] = useState({
@@ -118,6 +121,11 @@ const RiceScoring = () => {
            Object.keys(filters).some(key => key !== 'title' && filters[key].length > 0);
   };
 
+  const changeDensity = (value) => {
+    setDensity(value);
+    localStorage.setItem('tableDensity', value);
+  };
+
 
   const filteredTasks = getFilteredTasks();
 
@@ -162,110 +170,102 @@ const RiceScoring = () => {
         ) : (
           <>
             <div className="tasks-table">
+              {/* Density toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '8px 16px', borderBottom: '1px solid #e2e8f0', gap: '4px' }}>
+                <span style={{ fontSize: '12px', color: '#94a3b8', marginRight: '6px' }}>Вид:</span>
+                <button
+                  onClick={() => changeDensity('comfortable')}
+                  style={{
+                    padding: '4px 8px', border: '1px solid', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px',
+                    background: density === 'comfortable' ? '#eff6ff' : 'white',
+                    borderColor: density === 'comfortable' ? '#3b82f6' : '#e2e8f0',
+                    color: density === 'comfortable' ? '#3b82f6' : '#64748b',
+                    fontWeight: density === 'comfortable' ? 600 : 400
+                  }}
+                >
+                  <AlignJustify size={13} /> Comfortable
+                </button>
+                <button
+                  onClick={() => changeDensity('compact')}
+                  style={{
+                    padding: '4px 8px', border: '1px solid', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px',
+                    background: density === 'compact' ? '#eff6ff' : 'white',
+                    borderColor: density === 'compact' ? '#3b82f6' : '#e2e8f0',
+                    color: density === 'compact' ? '#3b82f6' : '#64748b',
+                    fontWeight: density === 'compact' ? 600 : 400
+                  }}
+                >
+                  <AlignLeft size={13} /> Compact
+                </button>
+              </div>
+
               <table>
                 <thead>
                   <tr>
-                    <th>
+                    <th className={`sticky-th density-${density}`}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         Название
-                        <ExcelFilter
-                          field="title"
-                          label="Название"
-                          isSearch={true}
-                          searchValue={filters.title}
-                          onSearchChange={(value) => setFilters(prev => ({ ...prev, title: value }))}
-                        />
+                        <ExcelFilter field="title" label="Название" isSearch={true} searchValue={filters.title} onSearchChange={(value) => setFilters(prev => ({ ...prev, title: value }))} />
                       </div>
                     </th>
-                    <th style={{ textAlign: 'center' }}>
+                    <th className={`sticky-th density-${density}`} style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         Value
-                        <ExcelFilter
-                          field="value"
-                          label="Value"
-                          values={getUniqueValues('value')}
-                          selectedValues={filters.value}
-                          onChange={(values) => setFilters(prev => ({ ...prev, value: values }))}
-                        />
+                        <ExcelFilter field="value" label="Value" values={getUniqueValues('value')} selectedValues={filters.value} onChange={(values) => setFilters(prev => ({ ...prev, value: values }))} />
                       </div>
                     </th>
-                    <th style={{ textAlign: 'center' }}>
+                    <th className={`sticky-th density-${density}`} style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         Reach
-                        <ExcelFilter
-                          field="reach"
-                          label="Reach"
-                          values={getUniqueValues('reach')}
-                          selectedValues={filters.reach}
-                          onChange={(values) => setFilters(prev => ({ ...prev, reach: values }))}
-                        />
+                        <ExcelFilter field="reach" label="Reach" values={getUniqueValues('reach')} selectedValues={filters.reach} onChange={(values) => setFilters(prev => ({ ...prev, reach: values }))} />
                       </div>
                     </th>
-                    <th style={{ textAlign: 'center' }}>
+                    <th className={`sticky-th density-${density}`} style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         Budget
-                        <ExcelFilter
-                          field="budget_impact"
-                          label="Budget Impact"
-                          values={getUniqueValues('budget_impact')}
-                          selectedValues={filters.budget_impact}
-                          onChange={(values) => setFilters(prev => ({ ...prev, budget_impact: values }))}
-                        />
+                        <ExcelFilter field="budget_impact" label="Budget Impact" values={getUniqueValues('budget_impact')} selectedValues={filters.budget_impact} onChange={(values) => setFilters(prev => ({ ...prev, budget_impact: values }))} />
                       </div>
                     </th>
-                    <th style={{ textAlign: 'center' }}>
+                    <th className={`sticky-th density-${density}`} style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         Confidence
-                        <ExcelFilter
-                          field="confidence"
-                          label="Confidence"
-                          values={getUniqueValues('confidence')}
-                          selectedValues={filters.confidence}
-                          onChange={(values) => setFilters(prev => ({ ...prev, confidence: values }))}
-                        />
+                        <ExcelFilter field="confidence" label="Confidence" values={getUniqueValues('confidence')} selectedValues={filters.confidence} onChange={(values) => setFilters(prev => ({ ...prev, confidence: values }))} />
                       </div>
                     </th>
-                    <th style={{ textAlign: 'center' }}>Score</th>
-                    <th>
+                    <th className={`sticky-th density-${density}`} style={{ textAlign: 'center' }}>Score</th>
+                    <th className={`sticky-th density-${density}`}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         Решение
-                        <ExcelFilter
-                          field="rice_category"
-                          label="Решение"
-                          values={getUniqueValues('rice_category')}
-                          selectedValues={filters.rice_category}
-                          onChange={(values) => setFilters(prev => ({ ...prev, rice_category: values }))}
-                        />
+                        <ExcelFilter field="rice_category" label="Решение" values={getUniqueValues('rice_category')} selectedValues={filters.rice_category} onChange={(values) => setFilters(prev => ({ ...prev, rice_category: values }))} />
                       </div>
                     </th>
-                    <th style={{ width: '150px' }}>Действия</th>
+                    <th className={`sticky-th density-${density}`} style={{ width: '140px' }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTasks.map(task => (
                     <tr key={task.id}>
-                      <td><strong>{task.title}</strong></td>
-                      <td style={{ textAlign: 'center' }}>{task.value}</td>
-                      <td style={{ textAlign: 'center' }}>{task.reach}</td>
-                      <td style={{ textAlign: 'center' }}>{task.budget_impact}</td>
-                      <td style={{ textAlign: 'center' }}>{task.confidence}%</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <strong style={{ fontSize: '1.1rem' }}>{task.rice_score.toFixed(1)}</strong>
+                      <td className={`density-td-${density}`}><span style={{ fontWeight: 500, color: '#1e293b' }}>{task.title}</span></td>
+                      <td className={`density-td-${density}`} style={{ textAlign: 'center', color: '#475569' }}>{task.value}</td>
+                      <td className={`density-td-${density}`} style={{ textAlign: 'center', color: '#475569' }}>{task.reach}</td>
+                      <td className={`density-td-${density}`} style={{ textAlign: 'center', color: '#475569' }}>{task.budget_impact}</td>
+                      <td className={`density-td-${density}`} style={{ textAlign: 'center', color: '#475569' }}>{task.confidence}%</td>
+                      <td className={`density-td-${density}`} style={{ textAlign: 'center' }}>
+                        <strong style={{ fontSize: '15px', color: '#1e293b' }}>{task.rice_score.toFixed(1)}</strong>
                       </td>
-                      <td>
-                        <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>
-                          {task.rice_category}
-                        </span>
+                      <td className={`density-td-${density}`}>
+                        <span className={`badge ${getRiceBadgeClass(task.rice_category)}`}>{task.rice_category}</span>
                       </td>
-                      <td>
-                        <button
-                          className="btn btn-primary btn-small"
-                          onClick={() => handleTransferToAll(task)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <ArrowRight size={14} />
-                          Перенести
-                        </button>
+                      <td className={`density-td-${density}`}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button className="btn btn-secondary btn-small" onClick={() => setCommentsTask(task)} title="Комментарии">
+                            <MessageSquare size={14} />
+                          </button>
+                          <button className="btn btn-primary btn-small" onClick={() => handleTransferToAll(task)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ArrowRight size={14} />
+                            Перенести
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -308,6 +308,11 @@ const RiceScoring = () => {
           isDraft={false}
         />
       )}
+
+      <CommentsPanel
+        task={commentsTask}
+        onClose={() => setCommentsTask(null)}
+      />
     </>
   );
 };

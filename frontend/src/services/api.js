@@ -33,5 +33,12 @@ export const analyticsAPI = {
   getEisenhowerMatrix: () => api.get('/analytics/eisenhower'),
 };
 
+// Comments
+export const commentsAPI = {
+  getAll: (taskId) => api.get(`/tasks/${taskId}/comments/`),
+  create: (taskId, text) => api.post(`/tasks/${taskId}/comments/`, { text }),
+  delete: (commentId) => api.delete(`/comments/${commentId}`),
+};
+
 export default api;
 

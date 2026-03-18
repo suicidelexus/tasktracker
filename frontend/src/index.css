@@ -12,6 +12,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5;
+  color: #334155; /* Основной текст — тёмно-серый, не чёрный */
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 code {
@@ -159,7 +162,7 @@ code {
 /* Header styles */
 .header {
   background-color: white;
-  padding: 15px 20px;
+  padding: 16px 24px;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
@@ -167,8 +170,10 @@ code {
 }
 
 .header h2 {
-  font-size: 1.5rem;
-  color: #1e293b;
+  font-size: 1.375rem;  /* H1 страницы — заметный, но спокойный */
+  font-weight: 700;
+  color: #0f172a;       /* Только для заголовков — почти чёрный */
+  letter-spacing: -0.01em;
 }
 
 /* Button styles */
@@ -222,7 +227,7 @@ code {
   width: 100%;
   background-color: white;
   border-radius: 8px;
-  overflow: hidden;
+  /* overflow: hidden убран — он ломает position: sticky на thead */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -231,19 +236,41 @@ code {
   border-collapse: collapse;
 }
 
-.tasks-table th {
+/* Sticky header */
+.sticky-th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background-color: #f8fafc;
-  padding: 12px 16px;
   text-align: left;
   font-weight: 600;
   color: #475569;
+  font-size: 13px;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.tasks-table td {
+/* Density: comfortable (default) */
+.sticky-th.density-comfortable {
+  padding: 12px 16px;
+}
+
+.density-td-comfortable {
   padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
-  color: #1e293b;
+  color: #334155;
+  font-size: 14px;
+}
+
+/* Density: compact */
+.sticky-th.density-compact {
+  padding: 7px 16px;
+}
+
+.density-td-compact {
+  padding: 7px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 13px;
 }
 
 .tasks-table tr:last-child td {

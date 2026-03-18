@@ -1,8 +1,9 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Upload, Download, ChevronDown, ExternalLink, X as XIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload, Download, ChevronDown, ExternalLink, X as XIcon, MessageSquare, AlignJustify, AlignLeft } from 'lucide-react';
 import { tasksAPI, projectsAPI } from '../services/api';
 import TaskModal from '../components/TaskModal';
 import ExcelFilter from '../components/ExcelFilter';
+import CommentsPanel from '../components/CommentsPanel';
 import axios from 'axios';
 
 const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false }) => {
@@ -13,6 +14,8 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
   const [editingTask, setEditingTask] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [commentsTask, setCommentsTask] = useState(null);
+  const [density, setDensity] = useState(() => localStorage.getItem('tableDensity') || 'comfortable');
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -234,6 +237,11 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
     return project ? project.name : '';
   };
 
+  const changeDensity = (value) => {
+    setDensity(value);
+    localStorage.setItem('tableDensity', value);
+  };
+
   if (loading) {
     return (
       <div className="loading">
@@ -363,12 +371,43 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
             <p>{showCompleted ? 'Нет завершенных задач' : 'Создайте первую задачу'}</p>
           </div>
         ) : (
-          <div className="tasks-table">
+        <div className="tasks-table">
+            {/* Density toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '8px 16px', borderBottom: '1px solid #e2e8f0', gap: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8', marginRight: '6px' }}>Вид:</span>
+              <button
+                onClick={() => changeDensity('comfortable')}
+                title="Комфортный"
+                style={{
+                  padding: '4px 8px', border: '1px solid', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px',
+                  background: density === 'comfortable' ? '#eff6ff' : 'white',
+                  borderColor: density === 'comfortable' ? '#3b82f6' : '#e2e8f0',
+                  color: density === 'comfortable' ? '#3b82f6' : '#64748b',
+                  fontWeight: density === 'comfortable' ? 600 : 400
+                }}
+              >
+                <AlignJustify size={13} /> Comfortable
+              </button>
+              <button
+                onClick={() => changeDensity('compact')}
+                title="Компактный"
+                style={{
+                  padding: '4px 8px', border: '1px solid', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px',
+                  background: density === 'compact' ? '#eff6ff' : 'white',
+                  borderColor: density === 'compact' ? '#3b82f6' : '#e2e8f0',
+                  color: density === 'compact' ? '#3b82f6' : '#64748b',
+                  fontWeight: density === 'compact' ? 600 : 400
+                }}
+              >
+                <AlignLeft size={13} /> Compact
+              </button>
+            </div>
+
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}></th>
-                  <th>
+                  <th className={`sticky-th density-${density}`} style={{ width: '40px' }}></th>
+                  <th className={`sticky-th density-${density}`}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Название
                       <ExcelFilter
@@ -380,7 +419,7 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
                       />
                     </div>
                   </th>
-                  <th>
+                  <th className={`sticky-th density-${density}`}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Исполнитель
                       <ExcelFilter
@@ -392,7 +431,7 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
                       />
                     </div>
                   </th>
-                  <th>
+                  <th className={`sticky-th density-${density}`}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Приоритет
                       <ExcelFilter
@@ -405,7 +444,7 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
                     </div>
                   </th>
                   {!projectId && (
-                    <th>
+                    <th className={`sticky-th density-${density}`}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         Проект
                         <ExcelFilter
@@ -424,7 +463,7 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
                       </div>
                     </th>
                   )}
-                  <th>
+                  <th className={`sticky-th density-${density}`}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       Priority Score
                       <ExcelFilter
@@ -436,21 +475,13 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
                       />
                     </div>
                   </th>
-                  <th style={{ width: '100px' }}>
+                  <th className={`sticky-th density-${density}`} style={{ width: '110px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       Действия
                       {hasActiveFilters() && (
                         <button
                           onClick={clearFilters}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            padding: '4px',
-                            fontWeight: '500'
-                          }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '12px', padding: '4px', fontWeight: '500' }}
                           title="Сбросить все фильтры"
                         >
                           <XIcon size={16} />
@@ -463,60 +494,46 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
               <tbody>
                 {tasks.map(task => (
                   <tr key={task.id} style={{ opacity: task.is_completed ? 0.6 : 1 }}>
-                    <td>
+                    <td className={`density-td-${density}`}>
                       <input
                         type="checkbox"
                         checked={task.is_completed}
                         onChange={() => handleToggleCompleted(task)}
-                        style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
                         title={task.is_completed ? 'Вернуть в работу' : 'Отметить выполненной'}
                       />
                     </td>
-                    <td>
+                    <td className={`density-td-${density}`}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong style={{ textDecoration: task.is_completed ? 'line-through' : 'none' }}>
+                        <span style={{ fontWeight: 500, color: '#1e293b', textDecoration: task.is_completed ? 'line-through' : 'none' }}>
                           {task.title}
-                        </strong>
+                        </span>
                         {task.link && (
-                          <a
-                            href={task.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#3b82f6', display: 'inline-flex' }}
-                            title="Открыть ссылку"
-                          >
-                            <ExternalLink size={14} />
+                          <a href={task.link} target="_blank" rel="noopener noreferrer" style={{ color: '#94a3b8', display: 'inline-flex', flexShrink: 0 }} title="Открыть ссылку">
+                            <ExternalLink size={13} />
                           </a>
                         )}
                       </div>
                     </td>
-                    <td>{task.assignee || '-'}</td>
-                    <td>{getPriorityBadge(task.priority || task.auto_priority) || '-'}</td>
+                    <td className={`density-td-${density}`} style={{ color: '#475569', fontSize: '13px' }}>{task.assignee || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                    <td className={`density-td-${density}`}>{getPriorityBadge(task.priority || task.auto_priority) || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                     {!projectId && (
-                      <td>
+                      <td className={`density-td-${density}`} style={{ color: '#475569', fontSize: '13px' }}>
                         {task.project ? (
-                          <span>
-                            {task.project.icon && `${task.project.icon} `}
-                            {task.project.name}
-                          </span>
-                        ) : '-'}
+                          <span>{task.project.icon && `${task.project.icon} `}{task.project.name}</span>
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
                     )}
-                    <td>{getRiceBadge(task) || '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <button
-                          className="btn btn-secondary btn-small"
-                          onClick={() => handleEditTask(task)}
-                          title="Редактировать"
-                        >
+                    <td className={`density-td-${density}`}>{getRiceBadge(task) || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                    <td className={`density-td-${density}`}>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button className="btn btn-secondary btn-small" onClick={() => setCommentsTask(task)} title="Комментарии">
+                          <MessageSquare size={14} />
+                        </button>
+                        <button className="btn btn-secondary btn-small" onClick={() => handleEditTask(task)} title="Редактировать">
                           <Pencil size={14} />
                         </button>
-                        <button
-                          className="btn btn-danger btn-small"
-                          onClick={() => handleDeleteTask(task.id)}
-                          title="Удалить"
-                        >
+                        <button className="btn btn-danger btn-small" onClick={() => handleDeleteTask(task.id)} title="Удалить">
                           <XIcon size={14} />
                         </button>
                       </div>
@@ -539,6 +556,11 @@ const AllTasks = ({ projectId = null, showCompleted = false, hideHeader = false 
           onSave={loadData}
         />
       )}
+
+      <CommentsPanel
+        task={commentsTask}
+        onClose={() => setCommentsTask(null)}
+      />
     </>
   );
 };
